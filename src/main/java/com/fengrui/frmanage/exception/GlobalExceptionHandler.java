@@ -18,6 +18,18 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     /**
+     * 处理业务异常。
+     *
+     * @param exception 业务异常
+     * @return 统一失败响应
+     */
+    @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleBusinessException(BusinessException exception) {
+        return Result.failure(exception.getCode(), exception.getMessage());
+    }
+
+    /**
      * 处理业务参数异常。
      *
      * @param exception 参数异常
