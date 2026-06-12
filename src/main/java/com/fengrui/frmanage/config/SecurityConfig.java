@@ -17,7 +17,15 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     /**
-     * 当前初始化阶段尚未接入登录态，先放行接口和文档路径，后续认证模块完成后再收紧权限。
+     * 临时放行开关：当前先闭环基础信息模块，JWT 延后开发。
+     * 正式接入 JWT 后改为 false，并将 anyRequest 调整为 authenticated 或角色权限规则。
+     */
+    private static final boolean TEMPORARY_PERMIT_ALL = true;
+
+    /**
+     * 配置安全过滤链。
+     * 临时策略：放行所有接口，便于基础模块联调。
+     * 正式策略：保留 Swagger 放行，业务接口通过 JWT 和角色权限拦截。
      *
      * @param http HTTP 安全配置
      * @return 安全过滤链
@@ -27,12 +35,14 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(registry -> registry
-                        .requestMatchers("/api/v1/user/**", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
-                        .permitAll()
-                        .anyRequest()
-                        .permitAll()
-                )
+                .authorizeHttpRequests(registry -> {
+                    registry.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
+                    if (TEMPORARY_PERMIT_ALL) {
+                        registry.anyRequest().permitAll();
+                    } else {
+                        registry.anyRequest().authenticated();
+                    }
+                })
                 .build();
     }
 

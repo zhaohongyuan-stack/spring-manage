@@ -29,15 +29,6 @@ public interface UserMapper extends BaseMapper<User> {
                 u.username,
                 u.real_name,
                 u.role,
-                CASE u.role
-                    WHEN 'dept_employee' THEN '部门员工'
-                    WHEN 'dept_head' THEN '部门负责人'
-                    WHEN 'purchaser' THEN '采购员'
-                    WHEN 'warehouse_keeper' THEN '仓库管理员'
-                    WHEN 'finance' THEN '财务'
-                    WHEN 'gm' THEN '酒店总经理'
-                    ELSE u.role
-                END AS role_name,
                 u.dept_id,
                 d.dept_name,
                 u.phone,

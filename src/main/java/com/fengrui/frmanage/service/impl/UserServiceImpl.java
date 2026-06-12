@@ -3,6 +3,7 @@ package com.fengrui.frmanage.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fengrui.frmanage.common.enums.RoleEnum;
 import com.fengrui.frmanage.dto.AddUserDTO;
 import com.fengrui.frmanage.dto.UserListQueryDTO;
 import com.fengrui.frmanage.entity.User;
@@ -14,7 +15,6 @@ import com.fengrui.frmanage.vo.UserListVO;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 /**
  * 用户业务服务实现。
@@ -68,6 +68,7 @@ public class UserServiceImpl implements UserService {
                 Page.of(queryDTO.getPageNum(), queryDTO.getPageSize()),
                 queryDTO
         );
+        page.getRecords().forEach(user -> user.setRoleName(RoleEnum.getNameByCode(user.getRole())));
         return new PageResultVO<>(page.getTotal(), page.getCurrent(), page.getSize(), page.getRecords());
     }
 
@@ -77,6 +78,11 @@ public class UserServiceImpl implements UserService {
      * @param addUserDTO 新增用户参数
      */
     private void validateAddUser(AddUserDTO addUserDTO) {
+        RoleEnum roleEnum = RoleEnum.getByCode(addUserDTO.getRole());
+        if (roleEnum == null) {
+            throw new IllegalArgumentException("角色编码不存在");
+        }
+
         Long sameUsernameCount = userMapper.selectCount(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, addUserDTO.getUsername())
         );
@@ -84,7 +90,7 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("登录账号已存在");
         }
 
-        if (requiresDepartment(addUserDTO.getRole()) && addUserDTO.getDeptId() == null) {
+        if (requiresDepartment(roleEnum) && addUserDTO.getDeptId() == null) {
             throw new IllegalArgumentException("部门员工或部门负责人必须指定所属部门");
         }
     }
@@ -92,10 +98,10 @@ public class UserServiceImpl implements UserService {
     /**
      * 判断角色是否必须绑定部门。
      *
-     * @param role 角色编码
+     * @param roleEnum 角色枚举
      * @return 是否必须指定部门
      */
-    private boolean requiresDepartment(String role) {
-        return StringUtils.hasText(role) && ("dept_employee".equals(role) || "dept_head".equals(role));
+    private boolean requiresDepartment(RoleEnum roleEnum) {
+        return RoleEnum.DEPT_EMPLOYEE == roleEnum || RoleEnum.DEPT_HEAD == roleEnum;
     }
 }
