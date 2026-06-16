@@ -46,7 +46,7 @@ public class Purchase {
     private BigDecimal totalAmount;
 
     @TableField("status")
-    private Short status;
+    private Integer status;
 
     @TableField("approver_id")
     private Long approverId;

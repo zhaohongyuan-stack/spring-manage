@@ -6,6 +6,11 @@ spring:
     url: jdbc:postgresql://localhost:5432/hotel_inventory
     username: postgres
     password: 123456
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
 
 server:
   port: 8080
