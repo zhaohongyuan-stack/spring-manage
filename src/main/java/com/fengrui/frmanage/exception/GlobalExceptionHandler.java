@@ -1,6 +1,7 @@
 package com.fengrui.frmanage.exception;
 
 import com.fengrui.frmanage.common.Result;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 
 import java.util.stream.Collectors;
 
@@ -63,6 +65,35 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleBindException(BindException exception) {
         return Result.failure(HttpStatus.BAD_REQUEST.value(), getValidateMessage(exception));
+    }
+
+    /**
+     * 处理单个请求参数校验异常。
+     *
+     * @param exception 参数校验异常
+     * @return 统一失败响应
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleConstraintViolationException(ConstraintViolationException exception) {
+        String message = exception.getConstraintViolations()
+                .stream()
+                .map(violation -> violation.getMessage())
+                .collect(Collectors.joining("；"));
+        return Result.failure(HttpStatus.BAD_REQUEST.value(), message);
+    }
+
+    /**
+     * 处理缺少必填请求参数异常。
+     *
+     * @param exception 缺少请求参数异常
+     * @return 统一失败响应
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException exception) {
+        return Result.failure(HttpStatus.BAD_REQUEST.value(), exception.getParameterName() + "不能为空");
     }
 
     /**
