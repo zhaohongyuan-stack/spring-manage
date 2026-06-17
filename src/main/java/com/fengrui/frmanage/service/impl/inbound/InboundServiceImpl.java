@@ -238,24 +238,15 @@ public class InboundServiceImpl implements InboundService {
 
     /**
      * 部门负责人验收完成后同步采购单状态。
-     * 全部明细累计收货完成时更新为已入库(4)；部分收货且采购单仍为已通过(2)时更新为采购中(3)。
+     * 验收通过即代表本次采购入库流程闭环，采购单同步更新为已入库(4)。
      *
      * @param purchaseId 采购单ID
      */
     private void updatePurchaseStatusAfterAcceptance(Long purchaseId) {
-        List<PurchaseItem> latestItems = getPurchaseItems(purchaseId);
         Purchase updatePurchase = new Purchase();
         updatePurchase.setId(purchaseId);
-        if (isPurchaseFullyReceived(latestItems)) {
-            updatePurchase.setStatus(PurchaseStatusEnum.INBOUNDED.getCode());
-            purchaseMapper.updateById(updatePurchase);
-            return;
-        }
-        Purchase currentPurchase = purchaseMapper.selectById(purchaseId);
-        if (currentPurchase != null && PurchaseStatusEnum.APPROVED.getCode().equals(currentPurchase.getStatus())) {
-            updatePurchase.setStatus(PurchaseStatusEnum.PURCHASING.getCode());
-            purchaseMapper.updateById(updatePurchase);
-        }
+        updatePurchase.setStatus(PurchaseStatusEnum.INBOUNDED.getCode());
+        purchaseMapper.updateById(updatePurchase);
     }
 
     private void validatePurchaseStatusForInbound(Purchase purchase) {
@@ -360,17 +351,6 @@ public class InboundServiceImpl implements InboundService {
         updatePurchaseItem.setId(purchaseItem.getId());
         updatePurchaseItem.setReceivedQuantity(newReceivedQuantity);
         purchaseItemMapper.updateById(updatePurchaseItem);
-    }
-
-    private boolean isPurchaseFullyReceived(List<PurchaseItem> purchaseItems) {
-        return purchaseItems.stream()
-                .allMatch(item -> {
-                    if (item.getQuantity() == null || item.getQuantity() <= 0) {
-                        return false;
-                    }
-                    int receivedQuantity = item.getReceivedQuantity() == null ? 0 : item.getReceivedQuantity();
-                    return receivedQuantity >= item.getQuantity();
-                });
     }
 
     /**

@@ -156,7 +156,8 @@ class InboundServiceImplTest {
         InboundItem inboundItem = buildInboundItem(80);
         when(inboundItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(inboundItem));
         PurchaseItem purchaseItem = buildPurchaseItem(1L, 100, 20);
-        when(purchaseItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(purchaseItem));
+        when(purchaseItemMapper.selectList(any(Wrapper.class)))
+                .thenReturn(List.of(purchaseItem), List.of(buildPurchaseItem(1L, 100, 20)));
         Inventory inventory = new Inventory();
         inventory.setProductId(1L);
         inventory.setStockQuantity(20);
@@ -181,7 +182,7 @@ class InboundServiceImplTest {
     }
 
     @Test
-    void confirmShouldKeepPurchasingWhenPartiallyReceived() {
+    void confirmShouldUpdatePurchasingPurchaseToInboundedWhenPartiallyReceived() {
         when(inboundMapper.selectById(301L)).thenReturn(buildInbound(InboundTypeEnum.NORMAL));
         when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.PURCHASING.getCode()));
         when(userMapper.selectById(1005L)).thenReturn(buildDeptHead());
@@ -198,11 +199,13 @@ class InboundServiceImplTest {
 
         inboundService.confirm(buildConfirmDTO());
 
-        verify(purchaseMapper, never()).updateById(any(Purchase.class));
+        ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseMapper).updateById(purchaseCaptor.capture());
+        assertEquals(PurchaseStatusEnum.INBOUNDED.getCode(), purchaseCaptor.getValue().getStatus());
     }
 
     @Test
-    void confirmShouldUpdateApprovedPurchaseToPurchasingWhenPartiallyReceived() {
+    void confirmShouldUpdateApprovedPurchaseToInboundedWhenPartiallyReceived() {
         when(inboundMapper.selectById(301L)).thenReturn(buildInbound(InboundTypeEnum.NORMAL));
         when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.APPROVED.getCode()));
         when(userMapper.selectById(1005L)).thenReturn(buildDeptHead());
@@ -221,7 +224,7 @@ class InboundServiceImplTest {
 
         ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
         verify(purchaseMapper).updateById(purchaseCaptor.capture());
-        assertEquals(PurchaseStatusEnum.PURCHASING.getCode(), purchaseCaptor.getValue().getStatus());
+        assertEquals(PurchaseStatusEnum.INBOUNDED.getCode(), purchaseCaptor.getValue().getStatus());
     }
 
     @Test
