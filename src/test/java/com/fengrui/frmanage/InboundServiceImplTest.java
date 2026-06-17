@@ -38,6 +38,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -111,6 +112,9 @@ class InboundServiceImplTest {
         ArgumentCaptor<InboundItem> itemCaptor = ArgumentCaptor.forClass(InboundItem.class);
         verify(inboundMapper).insert(inboundCaptor.capture());
         verify(inboundItemMapper).insert(itemCaptor.capture());
+        ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseMapper).updateById(purchaseCaptor.capture());
+        assertEquals(PurchaseStatusEnum.PURCHASING.getCode(), purchaseCaptor.getValue().getStatus());
         assertEquals("RK-20260616-001", inboundCaptor.getValue().getInboundNo());
         assertEquals(new BigDecimal("176.00"), inboundCaptor.getValue().getTotalAmount());
         assertEquals(301L, itemCaptor.getValue().getInboundId());
@@ -128,7 +132,7 @@ class InboundServiceImplTest {
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> inboundService.addInbound(buildAddInboundDTO(80)));
 
-        assertEquals("无权操作", exception.getMessage());
+        assertTrue(exception.getMessage().startsWith("无权操作"));
     }
 
     @Test
@@ -177,6 +181,50 @@ class InboundServiceImplTest {
     }
 
     @Test
+    void confirmShouldKeepPurchasingWhenPartiallyReceived() {
+        when(inboundMapper.selectById(301L)).thenReturn(buildInbound(InboundTypeEnum.NORMAL));
+        when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.PURCHASING.getCode()));
+        when(userMapper.selectById(1005L)).thenReturn(buildDeptHead());
+        when(userMapper.selectById(2001L)).thenReturn(buildWarehouseKeeper());
+        when(inboundItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildInboundItem(50)));
+        PurchaseItem purchaseItem = buildPurchaseItem(1L, 100, 0);
+        when(purchaseItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(purchaseItem));
+        Inventory inventory = new Inventory();
+        inventory.setProductId(1L);
+        inventory.setStockQuantity(0);
+        inventory.setUnitCost(BigDecimal.ZERO);
+        inventory.setTotalCost(BigDecimal.ZERO);
+        when(inventoryMapper.selectById(1L)).thenReturn(inventory);
+
+        inboundService.confirm(buildConfirmDTO());
+
+        verify(purchaseMapper, never()).updateById(any(Purchase.class));
+    }
+
+    @Test
+    void confirmShouldUpdateApprovedPurchaseToPurchasingWhenPartiallyReceived() {
+        when(inboundMapper.selectById(301L)).thenReturn(buildInbound(InboundTypeEnum.NORMAL));
+        when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.APPROVED.getCode()));
+        when(userMapper.selectById(1005L)).thenReturn(buildDeptHead());
+        when(userMapper.selectById(2001L)).thenReturn(buildWarehouseKeeper());
+        when(inboundItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildInboundItem(50)));
+        PurchaseItem purchaseItem = buildPurchaseItem(1L, 100, 0);
+        when(purchaseItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(purchaseItem));
+        Inventory inventory = new Inventory();
+        inventory.setProductId(1L);
+        inventory.setStockQuantity(0);
+        inventory.setUnitCost(BigDecimal.ZERO);
+        inventory.setTotalCost(BigDecimal.ZERO);
+        when(inventoryMapper.selectById(1L)).thenReturn(inventory);
+
+        inboundService.confirm(buildConfirmDTO());
+
+        ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseMapper).updateById(purchaseCaptor.capture());
+        assertEquals(PurchaseStatusEnum.PURCHASING.getCode(), purchaseCaptor.getValue().getStatus());
+    }
+
+    @Test
     void confirmDirectFoodShouldNotUpdateInventory() {
         when(inboundMapper.selectById(301L)).thenReturn(buildInbound(InboundTypeEnum.DIRECT_FOOD));
         when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.PURCHASING.getCode()));
@@ -193,6 +241,9 @@ class InboundServiceImplTest {
         ArgumentCaptor<InventoryRecord> recordCaptor = ArgumentCaptor.forClass(InventoryRecord.class);
         verify(inventoryMapper, never()).updateById(any(Inventory.class));
         verify(inventoryRecordMapper).insert(recordCaptor.capture());
+        ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseMapper).updateById(purchaseCaptor.capture());
+        assertEquals(PurchaseStatusEnum.INBOUNDED.getCode(), purchaseCaptor.getValue().getStatus());
         assertEquals(-80, recordCaptor.getValue().getChangeQuantity());
         assertEquals(20, recordCaptor.getValue().getBeforeQuantity());
         assertEquals(20, recordCaptor.getValue().getAfterQuantity());

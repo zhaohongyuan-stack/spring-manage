@@ -7,6 +7,7 @@ import com.fengrui.frmanage.common.enums.BizErrorCode;
 import com.fengrui.frmanage.common.enums.ProductStatusEnum;
 import com.fengrui.frmanage.common.enums.PurchaseStatusEnum;
 import com.fengrui.frmanage.common.enums.RoleEnum;
+import com.fengrui.frmanage.common.util.RoleAuthSupport;
 import com.fengrui.frmanage.dto.purchase.AddPurchaseDTO;
 import com.fengrui.frmanage.dto.purchase.AddPurchaseItemDTO;
 import com.fengrui.frmanage.dto.purchase.PurchaseApproveDTO;
@@ -207,7 +208,7 @@ public class PurchaseServiceImpl implements PurchaseService {
         Purchase purchase = getExistingPurchase(confirmDTO.getPurchaseId());
         assertStatus(purchase, PurchaseStatusEnum.APPROVED, "只有已通过采购单可以确认采购");
         User purchaser = assertUserExists(confirmDTO.getPurchaserUserId(), "采购员不存在");
-        assertAnyRole(purchaser, RoleEnum.PURCHASER, RoleEnum.ADMIN);
+        RoleAuthSupport.assertAnyRole(purchaser, RoleEnum.PURCHASER, RoleEnum.ADMIN);
 
         Purchase updatePurchase = new Purchase();
         updatePurchase.setId(purchase.getId());
@@ -346,13 +347,13 @@ public class PurchaseServiceImpl implements PurchaseService {
      * @param purchase 采购单
      */
     private void assertAdminOrDeptHeadOfPurchase(User approver, Purchase purchase) {
-        if (hasRole(approver, RoleEnum.ADMIN)) {
+        if (RoleAuthSupport.isSuperManager(approver)) {
             return;
         }
-        if (hasRole(approver, RoleEnum.DEPT_HEAD) && purchase.getDeptId().equals(approver.getDeptId())) {
+        if (RoleAuthSupport.hasRole(approver, RoleEnum.DEPT_HEAD) && purchase.getDeptId().equals(approver.getDeptId())) {
             return;
         }
-        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
+        throw RoleAuthSupport.forbidden(approver);
     }
 
     /**
@@ -362,38 +363,12 @@ public class PurchaseServiceImpl implements PurchaseService {
      * @param purchase 采购单
      */
     private void assertCanCancelPurchase(User operator, Purchase purchase) {
-        if (hasRole(operator, RoleEnum.ADMIN)
-                || hasRole(operator, RoleEnum.PURCHASER)
+        if (RoleAuthSupport.isSuperManager(operator)
+                || RoleAuthSupport.hasRole(operator, RoleEnum.PURCHASER)
                 || purchase.getApplyUserId().equals(operator.getId())) {
             return;
         }
-        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
-    }
-
-    /**
-     * 校验用户具备任一角色。
-     *
-     * @param user 用户
-     * @param roles 允许角色
-     */
-    private void assertAnyRole(User user, RoleEnum... roles) {
-        for (RoleEnum role : roles) {
-            if (hasRole(user, role)) {
-                return;
-            }
-        }
-        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
-    }
-
-    /**
-     * 判断用户是否具备指定角色。
-     *
-     * @param user 用户
-     * @param role 角色
-     * @return 是否具备指定角色
-     */
-    private boolean hasRole(User user, RoleEnum role) {
-        return role.getCode().equals(user.getRole());
+        throw RoleAuthSupport.forbidden(operator);
     }
 
     private void assertStatus(Purchase purchase, PurchaseStatusEnum expectedStatus, String message) {

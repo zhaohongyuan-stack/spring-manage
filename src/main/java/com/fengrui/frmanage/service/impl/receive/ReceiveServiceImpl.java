@@ -3,11 +3,11 @@ package com.fengrui.frmanage.service.impl.receive;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fengrui.frmanage.common.enums.BizErrorCode;
 import com.fengrui.frmanage.common.enums.InventoryChangeTypeEnum;
 import com.fengrui.frmanage.common.enums.ProductStatusEnum;
 import com.fengrui.frmanage.common.enums.ReceiveStatusEnum;
 import com.fengrui.frmanage.common.enums.RoleEnum;
+import com.fengrui.frmanage.common.util.RoleAuthSupport;
 import com.fengrui.frmanage.dto.receive.AddReceiveDTO;
 import com.fengrui.frmanage.dto.receive.AddReceiveItemDTO;
 import com.fengrui.frmanage.dto.receive.ReceiveApproveDTO;
@@ -99,7 +99,7 @@ public class ReceiveServiceImpl implements ReceiveService {
     public Map<String, Object> addReceive(AddReceiveDTO addReceiveDTO) {
         validateDepartment(addReceiveDTO.getDeptId());
         User applyUser = assertUserExists(addReceiveDTO.getApplyUserId(), "申请人不存在");
-        if (!addReceiveDTO.getDeptId().equals(applyUser.getDeptId())) {
+        if (!RoleAuthSupport.isSuperManager(applyUser) && !addReceiveDTO.getDeptId().equals(applyUser.getDeptId())) {
             throw new BusinessException("申请人所属部门必须与领用部门一致");
         }
 
@@ -212,7 +212,7 @@ public class ReceiveServiceImpl implements ReceiveService {
         Receive receive = getExistingReceive(confirmDTO.getReceiveId());
         assertStatus(receive, ReceiveStatusEnum.PENDING_OUTBOUND, "只有待出库领用单可以出库");
         User deliverer = assertUserExists(confirmDTO.getDelivererUserId(), "出库发货人不存在");
-        assertAnyRole(deliverer, RoleEnum.WAREHOUSE_KEEPER, RoleEnum.ADMIN);
+        RoleAuthSupport.assertAnyRole(deliverer, RoleEnum.WAREHOUSE_KEEPER, RoleEnum.ADMIN);
         List<ReceiveItem> items = receiveItemMapper.selectList(
                 new LambdaQueryWrapper<ReceiveItem>().eq(ReceiveItem::getReceiveId, receive.getId())
         );
@@ -326,7 +326,10 @@ public class ReceiveServiceImpl implements ReceiveService {
 
     private void validateDeptHead(Long userId, Long deptId) {
         User deptHead = assertUserExists(userId, "审批人不存在");
-        if (!RoleEnum.DEPT_HEAD.getCode().equals(deptHead.getRole()) || !deptId.equals(deptHead.getDeptId())) {
+        if (RoleAuthSupport.isSuperManager(deptHead)) {
+            return;
+        }
+        if (!RoleAuthSupport.hasRole(deptHead, RoleEnum.DEPT_HEAD) || !deptId.equals(deptHead.getDeptId())) {
             throw new BusinessException("审批人必须是领用部门负责人");
         }
     }
@@ -354,36 +357,10 @@ public class ReceiveServiceImpl implements ReceiveService {
      * @param receive 领用单
      */
     private void assertApplicantOrAdmin(User operator, Receive receive) {
-        if (hasRole(operator, RoleEnum.ADMIN) || receive.getApplyUserId().equals(operator.getId())) {
+        if (RoleAuthSupport.isSuperManager(operator) || receive.getApplyUserId().equals(operator.getId())) {
             return;
         }
-        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
-    }
-
-    /**
-     * 校验用户具备任一角色。
-     *
-     * @param user 用户
-     * @param roles 允许角色
-     */
-    private void assertAnyRole(User user, RoleEnum... roles) {
-        for (RoleEnum role : roles) {
-            if (hasRole(user, role)) {
-                return;
-            }
-        }
-        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
-    }
-
-    /**
-     * 判断用户是否具备指定角色。
-     *
-     * @param user 用户
-     * @param role 角色
-     * @return 是否具备指定角色
-     */
-    private boolean hasRole(User user, RoleEnum role) {
-        return role.getCode().equals(user.getRole());
+        throw RoleAuthSupport.forbidden(operator);
     }
 
     private void assertStatus(Receive receive, ReceiveStatusEnum expectedStatus, String message) {

@@ -39,6 +39,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -127,6 +128,29 @@ class ReceiveServiceImplTest {
     }
 
     @Test
+    void addReceiveShouldAllowAdminForAnyDept() {
+        when(departmentMapper.selectById(1L)).thenReturn(new Department());
+        when(userMapper.selectById(1L)).thenReturn(buildUser(1L, null, RoleEnum.ADMIN.getCode(), "管理员"));
+        when(receiveNoService.generateReceiveNo()).thenReturn("LY-20260616-002");
+        when(productMapper.selectById(1L)).thenReturn(buildProduct(1L, "一次性牙具套装"));
+        when(inventoryMapper.selectById(1L)).thenReturn(buildInventory(1L, 100, "2.20", "220.00"));
+        when(receiveMapper.insert(any(Receive.class))).thenAnswer(invocation -> {
+            Receive receive = invocation.getArgument(0);
+            receive.setId(202L);
+            return 1;
+        });
+
+        AddReceiveDTO addReceiveDTO = buildAddReceiveDTO();
+        addReceiveDTO.setApplyUserId(1L);
+        receiveService.addReceive(addReceiveDTO);
+
+        ArgumentCaptor<Receive> receiveCaptor = ArgumentCaptor.forClass(Receive.class);
+        verify(receiveMapper).insert(receiveCaptor.capture());
+        assertEquals(1L, receiveCaptor.getValue().getApplyUserId());
+        assertEquals(1L, receiveCaptor.getValue().getDeptId());
+    }
+
+    @Test
     void approveShouldRequireRemarkWhenRejected() {
         Receive receive = buildReceive(201L, ReceiveStatusEnum.PENDING_APPROVAL);
         when(receiveMapper.selectById(201L)).thenReturn(receive);
@@ -160,6 +184,25 @@ class ReceiveServiceImplTest {
     }
 
     @Test
+    void approveShouldAllowAdminForAnyDept() {
+        Receive receive = buildReceive(201L, ReceiveStatusEnum.PENDING_APPROVAL);
+        when(receiveMapper.selectById(201L)).thenReturn(receive);
+        when(userMapper.selectById(1L)).thenReturn(buildUser(1L, null, RoleEnum.ADMIN.getCode(), "管理员"));
+
+        ReceiveApproveDTO approveDTO = new ReceiveApproveDTO();
+        approveDTO.setReceiveId(201L);
+        approveDTO.setApproverUserId(1L);
+        approveDTO.setApproved(true);
+        approveDTO.setRemark("管理员审批");
+        receiveService.approve(approveDTO);
+
+        ArgumentCaptor<Receive> receiveCaptor = ArgumentCaptor.forClass(Receive.class);
+        verify(receiveMapper).updateById(receiveCaptor.capture());
+        assertEquals(ReceiveStatusEnum.PENDING_OUTBOUND.getCode().shortValue(), receiveCaptor.getValue().getStatus());
+        assertEquals(1L, receiveCaptor.getValue().getApproverId());
+    }
+
+    @Test
     void confirmShouldRejectWhenStockInsufficient() {
         Receive receive = buildReceive(201L, ReceiveStatusEnum.PENDING_OUTBOUND);
         when(receiveMapper.selectById(201L)).thenReturn(receive);
@@ -178,7 +221,7 @@ class ReceiveServiceImplTest {
         when(userMapper.selectById(1010L)).thenReturn(buildUser(1010L, 1L, RoleEnum.DEPT_EMPLOYEE.getCode(), "王五"));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> receiveService.confirm(buildConfirmDTO()));
-        assertEquals("无权操作", exception.getMessage());
+        assertTrue(exception.getMessage().startsWith("无权操作"));
     }
 
     @Test
@@ -229,7 +272,7 @@ class ReceiveServiceImplTest {
         cancelDTO.setOperatorUserId(1002L);
 
         BusinessException exception = assertThrows(BusinessException.class, () -> receiveService.cancel(cancelDTO));
-        assertEquals("无权操作", exception.getMessage());
+        assertTrue(exception.getMessage().startsWith("无权操作"));
     }
 
     @Test

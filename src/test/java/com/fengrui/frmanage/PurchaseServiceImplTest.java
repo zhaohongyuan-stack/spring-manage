@@ -39,6 +39,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -192,7 +193,7 @@ class PurchaseServiceImplTest {
 
         BusinessException exception = assertThrows(BusinessException.class, () -> purchaseService.approve(approveDTO));
         assertEquals(BizErrorCode.AUTH_FORBIDDEN.getCode(), exception.getCode());
-        assertEquals("无权操作", exception.getMessage());
+        assertTrue(exception.getMessage().startsWith("无权操作"));
     }
 
     @Test
@@ -234,6 +235,43 @@ class PurchaseServiceImplTest {
         verify(purchaseMapper).updateById(purchaseCaptor.capture());
         assertEquals(PurchaseStatusEnum.PURCHASING.getCode(), purchaseCaptor.getValue().getStatus());
         assertEquals(1008L, purchaseCaptor.getValue().getPurchaserId());
+    }
+
+    @Test
+    void confirmShouldAllowAdmin() {
+        Purchase purchase = new Purchase();
+        purchase.setId(101L);
+        purchase.setStatus(PurchaseStatusEnum.APPROVED.getCode());
+        when(purchaseMapper.selectById(101L)).thenReturn(purchase);
+        when(userMapper.selectById(1L)).thenReturn(buildUser(1L, null, RoleEnum.ADMIN.getCode()));
+
+        PurchaseConfirmDTO confirmDTO = new PurchaseConfirmDTO();
+        confirmDTO.setPurchaseId(101L);
+        confirmDTO.setPurchaserUserId(1L);
+        purchaseService.confirm(confirmDTO);
+
+        ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseMapper).updateById(purchaseCaptor.capture());
+        assertEquals(PurchaseStatusEnum.PURCHASING.getCode(), purchaseCaptor.getValue().getStatus());
+        assertEquals(1L, purchaseCaptor.getValue().getPurchaserId());
+    }
+
+    @Test
+    void confirmShouldAllowGmAccountForFullFlowTesting() {
+        Purchase purchase = new Purchase();
+        purchase.setId(101L);
+        purchase.setStatus(PurchaseStatusEnum.APPROVED.getCode());
+        when(purchaseMapper.selectById(101L)).thenReturn(purchase);
+        when(userMapper.selectById(1L)).thenReturn(buildUser(1L, null, RoleEnum.GM.getCode()));
+
+        PurchaseConfirmDTO confirmDTO = new PurchaseConfirmDTO();
+        confirmDTO.setPurchaseId(101L);
+        confirmDTO.setPurchaserUserId(1L);
+        purchaseService.confirm(confirmDTO);
+
+        ArgumentCaptor<Purchase> purchaseCaptor = ArgumentCaptor.forClass(Purchase.class);
+        verify(purchaseMapper).updateById(purchaseCaptor.capture());
+        assertEquals(PurchaseStatusEnum.PURCHASING.getCode(), purchaseCaptor.getValue().getStatus());
     }
 
     @Test
