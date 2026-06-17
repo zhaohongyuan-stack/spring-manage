@@ -39,6 +39,8 @@ public class ProductServiceImpl implements ProductService {
      */
     @Override
     public Long addProduct(AddProductDTO addProductDTO) {
+        validateNameSpecUnique(addProductDTO.getProductName(), addProductDTO.getSpec(), null);
+
         Product product = new Product();
         product.setProductName(addProductDTO.getProductName());
         product.setCategory(addProductDTO.getCategory());
@@ -129,6 +131,28 @@ public class ProductServiceImpl implements ProductService {
             throw new BusinessException("商品不存在");
         }
         return product;
+    }
+
+    /**
+     * 校验商品名称与规格组合在启用商品中唯一。
+     *
+     * @param productName 商品名称
+     * @param spec 规格型号
+     * @param excludeProductId 排除的商品ID，新增时传 null
+     */
+    private void validateNameSpecUnique(String productName, String spec, Long excludeProductId) {
+        String normalizedSpec = StringUtils.hasText(spec) ? spec : "";
+        LambdaQueryWrapper<Product> queryWrapper = new LambdaQueryWrapper<Product>()
+                .eq(Product::getProductName, productName)
+                .eq(Product::getStatus, ProductStatusEnum.ENABLED.getCode().shortValue())
+                .apply("COALESCE(spec, '') = {0}", normalizedSpec);
+        if (excludeProductId != null) {
+            queryWrapper.ne(Product::getId, excludeProductId);
+        }
+        Long sameNameSpecCount = productMapper.selectCount(queryWrapper);
+        if (sameNameSpecCount > 0) {
+            throw new BusinessException("商品名称与规格组合已存在");
+        }
     }
 
     /**

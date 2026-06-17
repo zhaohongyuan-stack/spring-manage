@@ -3,6 +3,7 @@ package com.fengrui.frmanage.service.impl.receive;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fengrui.frmanage.common.enums.BizErrorCode;
 import com.fengrui.frmanage.common.enums.InventoryChangeTypeEnum;
 import com.fengrui.frmanage.common.enums.ProductStatusEnum;
 import com.fengrui.frmanage.common.enums.ReceiveStatusEnum;
@@ -211,6 +212,7 @@ public class ReceiveServiceImpl implements ReceiveService {
         Receive receive = getExistingReceive(confirmDTO.getReceiveId());
         assertStatus(receive, ReceiveStatusEnum.PENDING_OUTBOUND, "只有待出库领用单可以出库");
         User deliverer = assertUserExists(confirmDTO.getDelivererUserId(), "出库发货人不存在");
+        assertAnyRole(deliverer, RoleEnum.WAREHOUSE_KEEPER, RoleEnum.ADMIN);
         List<ReceiveItem> items = receiveItemMapper.selectList(
                 new LambdaQueryWrapper<ReceiveItem>().eq(ReceiveItem::getReceiveId, receive.getId())
         );
@@ -245,7 +247,8 @@ public class ReceiveServiceImpl implements ReceiveService {
     @Transactional(rollbackFor = Exception.class)
     public void cancel(ReceiveCancelDTO cancelDTO) {
         Receive receive = getExistingReceive(cancelDTO.getReceiveId());
-        assertUserExists(cancelDTO.getOperatorUserId(), "操作人不存在");
+        User operator = assertUserExists(cancelDTO.getOperatorUserId(), "操作人不存在");
+        assertApplicantOrAdmin(operator, receive);
         if (!isCancelableStatus(receive.getStatus())) {
             throw new BusinessException("当前领用单状态不可取消");
         }
@@ -342,6 +345,45 @@ public class ReceiveServiceImpl implements ReceiveService {
             throw new BusinessException(message);
         }
         return user;
+    }
+
+    /**
+     * 校验操作人是领用申请人本人或管理员。
+     *
+     * @param operator 操作人
+     * @param receive 领用单
+     */
+    private void assertApplicantOrAdmin(User operator, Receive receive) {
+        if (hasRole(operator, RoleEnum.ADMIN) || receive.getApplyUserId().equals(operator.getId())) {
+            return;
+        }
+        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
+    }
+
+    /**
+     * 校验用户具备任一角色。
+     *
+     * @param user 用户
+     * @param roles 允许角色
+     */
+    private void assertAnyRole(User user, RoleEnum... roles) {
+        for (RoleEnum role : roles) {
+            if (hasRole(user, role)) {
+                return;
+            }
+        }
+        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
+    }
+
+    /**
+     * 判断用户是否具备指定角色。
+     *
+     * @param user 用户
+     * @param role 角色
+     * @return 是否具备指定角色
+     */
+    private boolean hasRole(User user, RoleEnum role) {
+        return role.getCode().equals(user.getRole());
     }
 
     private void assertStatus(Receive receive, ReceiveStatusEnum expectedStatus, String message) {

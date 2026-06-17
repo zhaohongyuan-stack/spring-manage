@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fengrui.frmanage.common.enums.InboundStatusEnum;
 import com.fengrui.frmanage.common.enums.InboundTypeEnum;
 import com.fengrui.frmanage.common.enums.InventoryChangeTypeEnum;
+import com.fengrui.frmanage.common.enums.BizErrorCode;
 import com.fengrui.frmanage.common.enums.PurchaseStatusEnum;
 import com.fengrui.frmanage.common.enums.RoleEnum;
 import com.fengrui.frmanage.dto.inbound.AddInboundDTO;
@@ -103,7 +104,8 @@ public class InboundServiceImpl implements InboundService {
     public Map<String, Object> addInbound(AddInboundDTO addInboundDTO) {
         Purchase purchase = getExistingPurchase(addInboundDTO.getPurchaseId());
         validatePurchaseStatusForInbound(purchase);
-        assertUserExists(addInboundDTO.getReceiverUserId(), "仓库管理员不存在");
+        User receiver = assertUserExists(addInboundDTO.getReceiverUserId(), "仓库管理员不存在");
+        assertAnyRole(receiver, RoleEnum.WAREHOUSE_KEEPER, RoleEnum.ADMIN);
         validateInboundType(addInboundDTO.getInboundType());
 
         List<PurchaseItem> purchaseItems = getPurchaseItems(purchase.getId());
@@ -205,6 +207,7 @@ public class InboundServiceImpl implements InboundService {
         Purchase purchase = getExistingPurchase(inbound.getPurchaseId());
         validateDeptHead(confirmDTO.getDeptHeadUserId(), purchase);
         User warehouseKeeper = assertUserExists(confirmDTO.getWarehouseKeeperUserId(), "仓库管理员不存在");
+        assertAnyRole(warehouseKeeper, RoleEnum.WAREHOUSE_KEEPER, RoleEnum.ADMIN);
         List<InboundItem> inboundItems = inboundItemMapper.selectList(
                 new LambdaQueryWrapper<InboundItem>().eq(InboundItem::getInboundId, inbound.getId())
         );
@@ -350,6 +353,9 @@ public class InboundServiceImpl implements InboundService {
 
     private void validateDeptHead(Long deptHeadUserId, Purchase purchase) {
         User deptHead = assertUserExists(deptHeadUserId, "部门负责人不存在");
+        if (hasRole(deptHead, RoleEnum.ADMIN)) {
+            return;
+        }
         if (!RoleEnum.DEPT_HEAD.getCode().equals(deptHead.getRole())
                 || !purchase.getDeptId().equals(deptHead.getDeptId())) {
             throw new BusinessException("验收人必须是申请部门负责人");
@@ -378,6 +384,32 @@ public class InboundServiceImpl implements InboundService {
             throw new BusinessException(message);
         }
         return user;
+    }
+
+    /**
+     * 校验用户具备任一角色。
+     *
+     * @param user 用户
+     * @param roles 允许角色
+     */
+    private void assertAnyRole(User user, RoleEnum... roles) {
+        for (RoleEnum role : roles) {
+            if (hasRole(user, role)) {
+                return;
+            }
+        }
+        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
+    }
+
+    /**
+     * 判断用户是否具备指定角色。
+     *
+     * @param user 用户
+     * @param role 角色
+     * @return 是否具备指定角色
+     */
+    private boolean hasRole(User user, RoleEnum role) {
+        return role.getCode().equals(user.getRole());
     }
 
     private List<PurchaseItem> getPurchaseItems(Long purchaseId) {

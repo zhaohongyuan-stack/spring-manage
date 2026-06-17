@@ -3,8 +3,10 @@ package com.fengrui.frmanage.service.impl.purchase;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fengrui.frmanage.common.enums.BizErrorCode;
 import com.fengrui.frmanage.common.enums.ProductStatusEnum;
 import com.fengrui.frmanage.common.enums.PurchaseStatusEnum;
+import com.fengrui.frmanage.common.enums.RoleEnum;
 import com.fengrui.frmanage.dto.purchase.AddPurchaseDTO;
 import com.fengrui.frmanage.dto.purchase.AddPurchaseItemDTO;
 import com.fengrui.frmanage.dto.purchase.PurchaseApproveDTO;
@@ -114,14 +116,15 @@ public class PurchaseServiceImpl implements PurchaseService {
         purchase.setStatus(PurchaseStatusEnum.PENDING_APPROVAL.getCode());
         purchase.setRemark(addPurchaseDTO.getRemark());
         purchaseMapper.insert(purchase);
+        Long purchaseId = resolvePurchaseIdAfterInsert(purchase);
 
         for (PurchaseItem purchaseItem : purchaseItems) {
-            purchaseItem.setPurchaseId(purchase.getId());
+            purchaseItem.setPurchaseId(purchaseId);
             purchaseItemMapper.insert(purchaseItem);
         }
 
         Map<String, Object> result = new HashMap<>();
-        result.put("purchaseId", purchase.getId());
+        result.put("purchaseId", purchaseId);
         result.put("purchaseNo", purchaseNo);
         return result;
     }
@@ -176,7 +179,8 @@ public class PurchaseServiceImpl implements PurchaseService {
     public void approve(PurchaseApproveDTO approveDTO) {
         Purchase purchase = getExistingPurchase(approveDTO.getPurchaseId());
         assertStatus(purchase, PurchaseStatusEnum.PENDING_APPROVAL, "只有待审批采购单可以审批");
-        assertUserExists(approveDTO.getApproverUserId(), "审批人不存在");
+        User approver = assertUserExists(approveDTO.getApproverUserId(), "审批人不存在");
+        assertAdminOrDeptHeadOfPurchase(approver, purchase);
         if (Boolean.FALSE.equals(approveDTO.getApproved()) && !StringUtils.hasText(approveDTO.getRemark())) {
             throw new BusinessException("驳回时必须填写驳回理由");
         }
@@ -202,7 +206,8 @@ public class PurchaseServiceImpl implements PurchaseService {
     public void confirm(PurchaseConfirmDTO confirmDTO) {
         Purchase purchase = getExistingPurchase(confirmDTO.getPurchaseId());
         assertStatus(purchase, PurchaseStatusEnum.APPROVED, "只有已通过采购单可以确认采购");
-        assertUserExists(confirmDTO.getPurchaserUserId(), "采购员不存在");
+        User purchaser = assertUserExists(confirmDTO.getPurchaserUserId(), "采购员不存在");
+        assertAnyRole(purchaser, RoleEnum.PURCHASER, RoleEnum.ADMIN);
 
         Purchase updatePurchase = new Purchase();
         updatePurchase.setId(purchase.getId());
@@ -221,7 +226,8 @@ public class PurchaseServiceImpl implements PurchaseService {
     @Transactional(rollbackFor = Exception.class)
     public void cancel(PurchaseCancelDTO cancelDTO) {
         Purchase purchase = getExistingPurchase(cancelDTO.getPurchaseId());
-        assertUserExists(cancelDTO.getOperatorUserId(), "操作人不存在");
+        User operator = assertUserExists(cancelDTO.getOperatorUserId(), "操作人不存在");
+        assertCanCancelPurchase(operator, purchase);
         if (!isCancelableStatus(purchase.getStatus())) {
             throw new BusinessException("当前采购单状态不可取消");
         }
@@ -240,11 +246,11 @@ public class PurchaseServiceImpl implements PurchaseService {
 
     private void validatePurchaseHeader(AddPurchaseDTO addPurchaseDTO) {
         if (departmentMapper.selectById(addPurchaseDTO.getDeptId()) == null) {
-            throw new BusinessException("申请部门不存在");
+            throw new BusinessException(BizErrorCode.PURCHASE_DEPT_NOT_FOUND);
         }
-        assertUserExists(addPurchaseDTO.getApplyUserId(), "申请人不存在");
+        assertActiveUserExists(addPurchaseDTO.getApplyUserId());
         if (supplierMapper.selectById(addPurchaseDTO.getSupplierId()) == null) {
-            throw new BusinessException("供应商不存在");
+            throw new BusinessException(BizErrorCode.PURCHASE_SUPPLIER_NOT_FOUND);
         }
     }
 
@@ -254,7 +260,7 @@ public class PurchaseServiceImpl implements PurchaseService {
             Product product = productMapper.selectById(item.getProductId());
             Short disabledStatus = ProductStatusEnum.DISABLED.getCode().shortValue();
             if (product == null || disabledStatus.equals(product.getStatus())) {
-                throw new BusinessException("商品不存在");
+                throw new BusinessException(BizErrorCode.PURCHASE_PRODUCT_NOT_FOUND);
             }
             productMap.put(product.getId(), product);
         }
@@ -288,10 +294,106 @@ public class PurchaseServiceImpl implements PurchaseService {
         return purchase;
     }
 
-    private void assertUserExists(Long userId, String message) {
-        if (userMapper.selectById(userId) == null) {
-            throw new BusinessException(message);
+    private User assertUserExists(Long userId, String message) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(400, message);
         }
+        return user;
+    }
+
+    /**
+     * 校验申请人存在且未禁用。
+     *
+     * @param userId 用户ID
+     */
+    private void assertActiveUserExists(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(BizErrorCode.PURCHASE_USER_NOT_FOUND);
+        }
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new BusinessException(BizErrorCode.PURCHASE_USER_DISABLED);
+        }
+    }
+
+    /**
+     * 插入采购单后解析主键ID。
+     *
+     * @param purchase 已插入的采购单
+     * @return 采购单主键ID
+     */
+    private Long resolvePurchaseIdAfterInsert(Purchase purchase) {
+        if (purchase.getId() != null) {
+            return purchase.getId();
+        }
+        Purchase savedPurchase = purchaseMapper.selectOne(
+                new LambdaQueryWrapper<Purchase>()
+                        .eq(Purchase::getPurchaseNo, purchase.getPurchaseNo())
+                        .orderByDesc(Purchase::getId)
+                        .last("LIMIT 1")
+        );
+        if (savedPurchase == null || savedPurchase.getId() == null) {
+            throw new BusinessException(BizErrorCode.PURCHASE_SAVE_FAILED);
+        }
+        return savedPurchase.getId();
+    }
+
+    /**
+     * 校验审批人是管理员或申请部门负责人。
+     *
+     * @param approver 审批人
+     * @param purchase 采购单
+     */
+    private void assertAdminOrDeptHeadOfPurchase(User approver, Purchase purchase) {
+        if (hasRole(approver, RoleEnum.ADMIN)) {
+            return;
+        }
+        if (hasRole(approver, RoleEnum.DEPT_HEAD) && purchase.getDeptId().equals(approver.getDeptId())) {
+            return;
+        }
+        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
+    }
+
+    /**
+     * 校验取消采购单权限。
+     *
+     * @param operator 操作人
+     * @param purchase 采购单
+     */
+    private void assertCanCancelPurchase(User operator, Purchase purchase) {
+        if (hasRole(operator, RoleEnum.ADMIN)
+                || hasRole(operator, RoleEnum.PURCHASER)
+                || purchase.getApplyUserId().equals(operator.getId())) {
+            return;
+        }
+        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
+    }
+
+    /**
+     * 校验用户具备任一角色。
+     *
+     * @param user 用户
+     * @param roles 允许角色
+     */
+    private void assertAnyRole(User user, RoleEnum... roles) {
+        for (RoleEnum role : roles) {
+            if (hasRole(user, role)) {
+                return;
+            }
+        }
+        throw new BusinessException(BizErrorCode.AUTH_FORBIDDEN);
+    }
+
+    /**
+     * 判断用户是否具备指定角色。
+     *
+     * @param user 用户
+     * @param role 角色
+     * @return 是否具备指定角色
+     */
+    private boolean hasRole(User user, RoleEnum role) {
+        return role.getCode().equals(user.getRole());
     }
 
     private void assertStatus(Purchase purchase, PurchaseStatusEnum expectedStatus, String message) {

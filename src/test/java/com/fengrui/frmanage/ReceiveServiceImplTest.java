@@ -172,6 +172,16 @@ class ReceiveServiceImplTest {
     }
 
     @Test
+    void confirmShouldRejectWhenDelivererNotWarehouseKeeperOrAdmin() {
+        Receive receive = buildReceive(201L, ReceiveStatusEnum.PENDING_OUTBOUND);
+        when(receiveMapper.selectById(201L)).thenReturn(receive);
+        when(userMapper.selectById(1010L)).thenReturn(buildUser(1010L, 1L, RoleEnum.DEPT_EMPLOYEE.getCode(), "王五"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> receiveService.confirm(buildConfirmDTO()));
+        assertEquals("无权操作", exception.getMessage());
+    }
+
+    @Test
     void confirmShouldDeductInventoryAndCreateRecord() {
         Receive receive = buildReceive(201L, ReceiveStatusEnum.PENDING_OUTBOUND);
         when(receiveMapper.selectById(201L)).thenReturn(receive);
@@ -206,6 +216,36 @@ class ReceiveServiceImplTest {
 
         BusinessException exception = assertThrows(BusinessException.class, () -> receiveService.cancel(cancelDTO));
         assertEquals("当前领用单状态不可取消", exception.getMessage());
+    }
+
+    @Test
+    void cancelShouldRejectWhenOperatorNotApplicantOrAdmin() {
+        Receive receive = buildReceive(201L, ReceiveStatusEnum.PENDING_APPROVAL);
+        when(receiveMapper.selectById(201L)).thenReturn(receive);
+        when(userMapper.selectById(1002L)).thenReturn(buildUser(1002L, 1L, RoleEnum.DEPT_EMPLOYEE.getCode(), "李四"));
+
+        ReceiveCancelDTO cancelDTO = new ReceiveCancelDTO();
+        cancelDTO.setReceiveId(201L);
+        cancelDTO.setOperatorUserId(1002L);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> receiveService.cancel(cancelDTO));
+        assertEquals("无权操作", exception.getMessage());
+    }
+
+    @Test
+    void cancelShouldAllowAdmin() {
+        Receive receive = buildReceive(201L, ReceiveStatusEnum.PENDING_APPROVAL);
+        when(receiveMapper.selectById(201L)).thenReturn(receive);
+        when(userMapper.selectById(1L)).thenReturn(buildUser(1L, null, RoleEnum.ADMIN.getCode(), "管理员"));
+
+        ReceiveCancelDTO cancelDTO = new ReceiveCancelDTO();
+        cancelDTO.setReceiveId(201L);
+        cancelDTO.setOperatorUserId(1L);
+        receiveService.cancel(cancelDTO);
+
+        ArgumentCaptor<Receive> receiveCaptor = ArgumentCaptor.forClass(Receive.class);
+        verify(receiveMapper).updateById(receiveCaptor.capture());
+        assertEquals(ReceiveStatusEnum.CANCELLED.getCode().shortValue(), receiveCaptor.getValue().getStatus());
     }
 
     private AddReceiveDTO buildAddReceiveDTO() {

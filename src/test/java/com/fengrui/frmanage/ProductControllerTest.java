@@ -88,6 +88,27 @@ class ProductControllerTest {
     }
 
     @Test
+    void addProductShouldReturnBusinessErrorWhenNameSpecDuplicated() throws Exception {
+        doThrow(new BusinessException("商品名称与规格组合已存在")).when(productService).addProduct(any());
+
+        mockMvc.perform(post("/api/v1/product/add")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "productName": "瓶装洗发水",
+                                  "category": "客房用品",
+                                  "spec": "320ml/瓶",
+                                  "unit": "瓶",
+                                  "costPrice": 4.10,
+                                  "warningThreshold": 30
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("商品名称与规格组合已存在"));
+    }
+
+    @Test
     void listProductShouldReturnEnabledProductPage() throws Exception {
         ProductVO productVO = new ProductVO();
         productVO.setProductId(1L);

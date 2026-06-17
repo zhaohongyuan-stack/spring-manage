@@ -96,7 +96,7 @@ class InboundServiceImplTest {
     @Test
     void addInboundShouldInsertHeaderAndItems() {
         when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.APPROVED.getCode()));
-        when(userMapper.selectById(2001L)).thenReturn(new User());
+        when(userMapper.selectById(2001L)).thenReturn(buildWarehouseKeeper());
         when(purchaseItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildPurchaseItem(1L, 100, 20)));
         when(inboundNoService.generateInboundNo()).thenReturn("RK-20260616-001");
         when(inboundMapper.insert(any(Inbound.class))).thenAnswer(invocation -> {
@@ -118,9 +118,23 @@ class InboundServiceImplTest {
     }
 
     @Test
+    void addInboundShouldRejectWhenReceiverNotWarehouseKeeperOrAdmin() {
+        when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.APPROVED.getCode()));
+        User receiver = new User();
+        receiver.setId(2001L);
+        receiver.setRole(RoleEnum.PURCHASER.getCode());
+        when(userMapper.selectById(2001L)).thenReturn(receiver);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> inboundService.addInbound(buildAddInboundDTO(80)));
+
+        assertEquals("无权操作", exception.getMessage());
+    }
+
+    @Test
     void addInboundShouldRejectWhenQuantityExceedsRemaining() {
         when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.APPROVED.getCode()));
-        when(userMapper.selectById(2001L)).thenReturn(new User());
+        when(userMapper.selectById(2001L)).thenReturn(buildWarehouseKeeper());
         when(purchaseItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildPurchaseItem(1L, 100, 20)));
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -199,6 +213,34 @@ class InboundServiceImplTest {
         assertEquals("验收人必须是申请部门负责人", exception.getMessage());
     }
 
+    @Test
+    void confirmShouldAllowAdminAsDeptHeadOperator() {
+        when(inboundMapper.selectById(301L)).thenReturn(buildInbound(InboundTypeEnum.NORMAL));
+        when(purchaseMapper.selectById(101L)).thenReturn(buildPurchase(PurchaseStatusEnum.PURCHASING.getCode()));
+        User admin = new User();
+        admin.setId(1L);
+        admin.setRole(RoleEnum.ADMIN.getCode());
+        admin.setRealName("管理员");
+        when(userMapper.selectById(1L)).thenReturn(admin);
+        when(userMapper.selectById(2001L)).thenReturn(buildWarehouseKeeper());
+        when(inboundItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildInboundItem(80)));
+        when(purchaseItemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildPurchaseItem(1L, 100, 20)));
+        Inventory inventory = new Inventory();
+        inventory.setProductId(1L);
+        inventory.setStockQuantity(20);
+        inventory.setUnitCost(new BigDecimal("2.00"));
+        inventory.setTotalCost(new BigDecimal("40.00"));
+        when(inventoryMapper.selectById(1L)).thenReturn(inventory);
+
+        InboundConfirmDTO confirmDTO = buildConfirmDTO();
+        confirmDTO.setDeptHeadUserId(1L);
+        inboundService.confirm(confirmDTO);
+
+        ArgumentCaptor<Inbound> inboundCaptor = ArgumentCaptor.forClass(Inbound.class);
+        verify(inboundMapper).updateById(inboundCaptor.capture());
+        assertEquals(1L, inboundCaptor.getValue().getDeptHeadId());
+    }
+
     private AddInboundDTO buildAddInboundDTO(Integer actualQuantity) {
         AddInboundItemDTO itemDTO = new AddInboundItemDTO();
         itemDTO.setProductId(1L);
@@ -273,6 +315,7 @@ class InboundServiceImplTest {
     private User buildWarehouseKeeper() {
         User user = new User();
         user.setId(2001L);
+        user.setRole(RoleEnum.WAREHOUSE_KEEPER.getCode());
         user.setRealName("李四");
         return user;
     }

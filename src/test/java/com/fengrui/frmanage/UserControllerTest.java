@@ -1,6 +1,7 @@
 package com.fengrui.frmanage;
 
 import com.fengrui.frmanage.controller.UserController;
+import com.fengrui.frmanage.exception.BusinessException;
 import com.fengrui.frmanage.exception.GlobalExceptionHandler;
 import com.fengrui.frmanage.service.UserService;
 import com.fengrui.frmanage.vo.AddUserVO;
@@ -13,7 +14,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -70,5 +73,50 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("登录账号不能为空"));
+    }
+
+    @Test
+    void deleteUserShouldReturnSuccess() throws Exception {
+        mockMvc.perform(post("/api/v1/user/delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": 101
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("删除成功"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    void deleteUserShouldReturnBusinessErrorWhenUserNotFound() throws Exception {
+        doThrow(new BusinessException("用户不存在")).when(userService).deleteUser(any());
+
+        mockMvc.perform(post("/api/v1/user/delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": 999
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("用户不存在"));
+    }
+
+    @Test
+    void deleteUserShouldValidateUserId() throws Exception {
+        mockMvc.perform(post("/api/v1/user/delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": null
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("用户ID不能为空")));
     }
 }

@@ -3,12 +3,15 @@ package com.fengrui.frmanage.service.impl.supplier;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fengrui.frmanage.common.enums.BizErrorCode;
 import com.fengrui.frmanage.common.enums.SupplierStatusEnum;
 import com.fengrui.frmanage.dto.supplier.AddSupplierDTO;
 import com.fengrui.frmanage.dto.supplier.DeleteSupplierDTO;
 import com.fengrui.frmanage.dto.supplier.SupplierQueryDTO;
+import com.fengrui.frmanage.entity.Purchase;
 import com.fengrui.frmanage.entity.Supplier;
 import com.fengrui.frmanage.exception.BusinessException;
+import com.fengrui.frmanage.mapper.PurchaseMapper;
 import com.fengrui.frmanage.mapper.SupplierMapper;
 import com.fengrui.frmanage.service.supplier.SupplierService;
 import com.fengrui.frmanage.vo.PageResultVO;
@@ -26,8 +29,11 @@ public class SupplierServiceImpl implements SupplierService {
 
     private final SupplierMapper supplierMapper;
 
-    public SupplierServiceImpl(SupplierMapper supplierMapper) {
+    private final PurchaseMapper purchaseMapper;
+
+    public SupplierServiceImpl(SupplierMapper supplierMapper, PurchaseMapper purchaseMapper) {
         this.supplierMapper = supplierMapper;
+        this.purchaseMapper = purchaseMapper;
     }
 
     /**
@@ -60,6 +66,12 @@ public class SupplierServiceImpl implements SupplierService {
         Supplier supplier = supplierMapper.selectById(deleteSupplierDTO.getId());
         if (supplier == null) {
             throw new BusinessException("供应商不存在");
+        }
+        Long purchaseCount = purchaseMapper.selectCount(
+                new LambdaQueryWrapper<Purchase>().eq(Purchase::getSupplierId, deleteSupplierDTO.getId())
+        );
+        if (purchaseCount > 0) {
+            throw new BusinessException(BizErrorCode.SUPPLIER_REFERENCED);
         }
         supplierMapper.deleteById(deleteSupplierDTO.getId());
     }
