@@ -8,6 +8,7 @@ import com.fengrui.frmanage.common.enums.InboundTypeEnum;
 import com.fengrui.frmanage.common.enums.InventoryChangeTypeEnum;
 import com.fengrui.frmanage.common.enums.PurchaseStatusEnum;
 import com.fengrui.frmanage.common.enums.RoleEnum;
+import com.fengrui.frmanage.common.util.RoleAuthSupport;
 import com.fengrui.frmanage.dto.inbound.AddInboundDTO;
 import com.fengrui.frmanage.dto.inbound.AddInboundItemDTO;
 import com.fengrui.frmanage.dto.inbound.InboundConfirmDTO;
@@ -103,7 +104,8 @@ public class InboundServiceImpl implements InboundService {
     public Map<String, Object> addInbound(AddInboundDTO addInboundDTO) {
         Purchase purchase = getExistingPurchase(addInboundDTO.getPurchaseId());
         validatePurchaseStatusForInbound(purchase);
-        assertUserExists(addInboundDTO.getReceiverUserId(), "仓库管理员不存在");
+        User receiver = assertUserExists(addInboundDTO.getReceiverUserId(), "仓库管理员不存在");
+        RoleAuthSupport.assertAnyRole(receiver, RoleEnum.WAREHOUSE_KEEPER, RoleEnum.ADMIN);
         validateInboundType(addInboundDTO.getInboundType());
 
         List<PurchaseItem> purchaseItems = getPurchaseItems(purchase.getId());
@@ -130,6 +132,8 @@ public class InboundServiceImpl implements InboundService {
             inboundItem.setInboundId(inbound.getId());
             inboundItemMapper.insert(inboundItem);
         }
+
+        markPurchaseAsPurchasingIfApproved(purchase);
 
         Map<String, Object> result = new HashMap<>();
         result.put("inboundId", inbound.getId());
@@ -205,6 +209,7 @@ public class InboundServiceImpl implements InboundService {
         Purchase purchase = getExistingPurchase(inbound.getPurchaseId());
         validateDeptHead(confirmDTO.getDeptHeadUserId(), purchase);
         User warehouseKeeper = assertUserExists(confirmDTO.getWarehouseKeeperUserId(), "仓库管理员不存在");
+        RoleAuthSupport.assertAnyRole(warehouseKeeper, RoleEnum.WAREHOUSE_KEEPER, RoleEnum.ADMIN);
         List<InboundItem> inboundItems = inboundItemMapper.selectList(
                 new LambdaQueryWrapper<InboundItem>().eq(InboundItem::getInboundId, inbound.getId())
         );
@@ -228,10 +233,27 @@ public class InboundServiceImpl implements InboundService {
         updateInbound.setAcceptTime(LocalDateTime.now());
         inboundMapper.updateById(updateInbound);
 
-        if (isPurchaseFullyReceived(purchaseItems)) {
-            Purchase updatePurchase = new Purchase();
-            updatePurchase.setId(purchase.getId());
+        updatePurchaseStatusAfterAcceptance(purchase.getId());
+    }
+
+    /**
+     * 部门负责人验收完成后同步采购单状态。
+     * 全部明细累计收货完成时更新为已入库(4)；部分收货且采购单仍为已通过(2)时更新为采购中(3)。
+     *
+     * @param purchaseId 采购单ID
+     */
+    private void updatePurchaseStatusAfterAcceptance(Long purchaseId) {
+        List<PurchaseItem> latestItems = getPurchaseItems(purchaseId);
+        Purchase updatePurchase = new Purchase();
+        updatePurchase.setId(purchaseId);
+        if (isPurchaseFullyReceived(latestItems)) {
             updatePurchase.setStatus(PurchaseStatusEnum.INBOUNDED.getCode());
+            purchaseMapper.updateById(updatePurchase);
+            return;
+        }
+        Purchase currentPurchase = purchaseMapper.selectById(purchaseId);
+        if (currentPurchase != null && PurchaseStatusEnum.APPROVED.getCode().equals(currentPurchase.getStatus())) {
+            updatePurchase.setStatus(PurchaseStatusEnum.PURCHASING.getCode());
             purchaseMapper.updateById(updatePurchase);
         }
     }
@@ -343,14 +365,35 @@ public class InboundServiceImpl implements InboundService {
     private boolean isPurchaseFullyReceived(List<PurchaseItem> purchaseItems) {
         return purchaseItems.stream()
                 .allMatch(item -> {
+                    if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                        return false;
+                    }
                     int receivedQuantity = item.getReceivedQuantity() == null ? 0 : item.getReceivedQuantity();
                     return receivedQuantity >= item.getQuantity();
                 });
     }
 
+    /**
+     * 创建入库单后，若采购单仍为已通过(2)，则推进为采购中(3)。
+     *
+     * @param purchase 采购单
+     */
+    private void markPurchaseAsPurchasingIfApproved(Purchase purchase) {
+        if (!PurchaseStatusEnum.APPROVED.getCode().equals(purchase.getStatus())) {
+            return;
+        }
+        Purchase updatePurchase = new Purchase();
+        updatePurchase.setId(purchase.getId());
+        updatePurchase.setStatus(PurchaseStatusEnum.PURCHASING.getCode());
+        purchaseMapper.updateById(updatePurchase);
+    }
+
     private void validateDeptHead(Long deptHeadUserId, Purchase purchase) {
         User deptHead = assertUserExists(deptHeadUserId, "部门负责人不存在");
-        if (!RoleEnum.DEPT_HEAD.getCode().equals(deptHead.getRole())
+        if (RoleAuthSupport.isSuperManager(deptHead)) {
+            return;
+        }
+        if (!RoleAuthSupport.hasRole(deptHead, RoleEnum.DEPT_HEAD)
                 || !purchase.getDeptId().equals(deptHead.getDeptId())) {
             throw new BusinessException("验收人必须是申请部门负责人");
         }

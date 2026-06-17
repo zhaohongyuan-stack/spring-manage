@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fengrui.frmanage.common.enums.RoleEnum;
 import com.fengrui.frmanage.dto.AddUserDTO;
+import com.fengrui.frmanage.dto.DeleteUserDTO;
 import com.fengrui.frmanage.dto.UserListQueryDTO;
 import com.fengrui.frmanage.entity.User;
+import com.fengrui.frmanage.exception.BusinessException;
 import com.fengrui.frmanage.mapper.UserMapper;
 import com.fengrui.frmanage.service.UserService;
 import com.fengrui.frmanage.vo.AddUserVO;
@@ -23,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
     private static final short ENABLED_STATUS = 1;
+
+    private static final short DISABLED_STATUS = 0;
 
     private final UserMapper userMapper;
 
@@ -70,6 +74,35 @@ public class UserServiceImpl implements UserService {
         );
         page.getRecords().forEach(user -> user.setRoleName(RoleEnum.getNameByCode(user.getRole())));
         return new PageResultVO<>(page.getTotal(), page.getCurrent(), page.getSize(), page.getRecords());
+    }
+
+    /**
+     * 删除系统用户（逻辑禁用）。
+     *
+     * @param deleteUserDTO 删除用户参数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteUser(DeleteUserDTO deleteUserDTO) {
+        User existsUser = getExistingUser(deleteUserDTO.getUserId());
+        User user = new User();
+        user.setId(existsUser.getId());
+        user.setStatus(DISABLED_STATUS);
+        userMapper.updateById(user);
+    }
+
+    /**
+     * 获取已存在的启用用户。
+     *
+     * @param userId 用户ID
+     * @return 用户实体
+     */
+    private User getExistingUser(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null || DISABLED_STATUS == user.getStatus()) {
+            throw new BusinessException("用户不存在");
+        }
+        return user;
     }
 
     /**

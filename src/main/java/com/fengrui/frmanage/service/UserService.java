@@ -1,6 +1,7 @@
 package com.fengrui.frmanage.service;
 
 import com.fengrui.frmanage.dto.AddUserDTO;
+import com.fengrui.frmanage.dto.DeleteUserDTO;
 import com.fengrui.frmanage.dto.UserListQueryDTO;
 import com.fengrui.frmanage.vo.AddUserVO;
 import com.fengrui.frmanage.vo.PageResultVO;
@@ -26,4 +27,11 @@ public interface UserService {
      * @return 用户分页数据
      */
     PageResultVO<UserListVO> listUsers(UserListQueryDTO queryDTO);
+
+    /**
+     * 删除系统用户。
+     *
+     * @param deleteUserDTO 删除用户参数
+     */
+    void deleteUser(DeleteUserDTO deleteUserDTO);
 }
