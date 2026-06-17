@@ -9,6 +9,7 @@ import com.fengrui.frmanage.dto.DeleteUserDTO;
 import com.fengrui.frmanage.dto.UserListQueryDTO;
 import com.fengrui.frmanage.entity.User;
 import com.fengrui.frmanage.exception.BusinessException;
+import com.fengrui.frmanage.mapper.DepartmentMapper;
 import com.fengrui.frmanage.mapper.UserMapper;
 import com.fengrui.frmanage.service.UserService;
 import com.fengrui.frmanage.vo.AddUserVO;
@@ -30,10 +31,15 @@ public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
 
+    private final DepartmentMapper departmentMapper;
+
     private final PasswordEncoder passwordEncoder;
 
-    public UserServiceImpl(UserMapper userMapper, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserMapper userMapper,
+                           DepartmentMapper departmentMapper,
+                           PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
+        this.departmentMapper = departmentMapper;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -53,7 +59,7 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(addUserDTO.getPassword()));
         user.setRealName(addUserDTO.getRealName());
         user.setRole(addUserDTO.getRole());
-        user.setDeptId(addUserDTO.getDeptId());
+        user.setDeptId(resolveDeptId(addUserDTO));
         user.setPhone(addUserDTO.getPhone());
         user.setStatus(ENABLED_STATUS);
         userMapper.insert(user);
@@ -113,19 +119,43 @@ public class UserServiceImpl implements UserService {
     private void validateAddUser(AddUserDTO addUserDTO) {
         RoleEnum roleEnum = RoleEnum.getByCode(addUserDTO.getRole());
         if (roleEnum == null) {
-            throw new IllegalArgumentException("角色编码不存在");
+            throw new BusinessException("角色编码不存在");
         }
 
         Long sameUsernameCount = userMapper.selectCount(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, addUserDTO.getUsername())
         );
         if (sameUsernameCount > 0) {
-            throw new IllegalArgumentException("登录账号已存在");
+            throw new BusinessException("登录账号已存在");
         }
 
-        if (requiresDepartment(roleEnum) && addUserDTO.getDeptId() == null) {
-            throw new IllegalArgumentException("部门员工或部门负责人必须指定所属部门");
+        if (requiresDepartment(roleEnum)) {
+            if (addUserDTO.getDeptId() == null) {
+                throw new BusinessException("部门员工或部门负责人必须指定所属部门");
+            }
+            if (departmentMapper.selectById(addUserDTO.getDeptId()) == null) {
+                throw new BusinessException("所属部门不存在");
+            }
+            return;
         }
+
+        if (addUserDTO.getDeptId() != null && departmentMapper.selectById(addUserDTO.getDeptId()) == null) {
+            throw new BusinessException("所属部门不存在");
+        }
+    }
+
+    /**
+     * 解析入库部门ID：职能类角色不绑定部门。
+     *
+     * @param addUserDTO 新增用户参数
+     * @return 部门ID，职能类角色返回 null
+     */
+    private Long resolveDeptId(AddUserDTO addUserDTO) {
+        RoleEnum roleEnum = RoleEnum.getByCode(addUserDTO.getRole());
+        if (roleEnum == null || !requiresDepartment(roleEnum)) {
+            return null;
+        }
+        return addUserDTO.getDeptId();
     }
 
     /**

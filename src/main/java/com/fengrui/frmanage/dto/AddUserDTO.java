@@ -34,7 +34,7 @@ public class AddUserDTO {
     @Schema(description = "角色编码", example = "dept_head", requiredMode = Schema.RequiredMode.REQUIRED)
     private String role;
 
-    @Schema(description = "所属部门ID，部门员工和部门负责人必填", example = "1")
+    @Schema(description = "所属部门ID；仅部门员工、部门负责人必填；采购员/仓管/财务等职能角色可不填", example = "1")
     private Long deptId;
 
     @Size(max = 20, message = "联系电话长度不能超过20个字符")

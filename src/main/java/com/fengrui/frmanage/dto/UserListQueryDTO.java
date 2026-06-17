@@ -25,13 +25,13 @@ public class UserListQueryDTO {
     private Long pageSize = 10L;
 
     @Size(max = 50, message = "真实姓名长度不能超过50个字符")
-    @Schema(description = "真实姓名，支持模糊查询", example = "张伟")
+    @Schema(description = "真实姓名，支持模糊查询；不传则不按姓名筛选", example = "张伟", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String realName;
 
     @Size(max = 20, message = "角色长度不能超过20个字符")
-    @Schema(description = "角色编码", example = "dept_head")
+    @Schema(description = "角色编码；不传则不按角色筛选", example = "dept_head", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String role;
 
-    @Schema(description = "部门ID", example = "1")
+    @Schema(description = "部门ID；不传则不按部门筛选", example = "1", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private Long deptId;
 }

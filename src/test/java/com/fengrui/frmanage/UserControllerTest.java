@@ -1,10 +1,13 @@
 package com.fengrui.frmanage;
 
+import com.fengrui.frmanage.config.WebMvcBindingConfig;
 import com.fengrui.frmanage.controller.UserController;
 import com.fengrui.frmanage.exception.BusinessException;
 import com.fengrui.frmanage.exception.GlobalExceptionHandler;
 import com.fengrui.frmanage.service.UserService;
 import com.fengrui.frmanage.vo.AddUserVO;
+import com.fengrui.frmanage.vo.PageResultVO;
+import com.fengrui.frmanage.vo.UserListVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -14,10 +17,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -26,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 用户接口控制器测试。
  */
 @WebMvcTest(UserController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, WebMvcBindingConfig.class})
 @AutoConfigureMockMvc(addFilters = false)
 class UserControllerTest {
 
@@ -35,6 +42,32 @@ class UserControllerTest {
 
     @MockBean
     private UserService userService;
+
+    @Test
+    void listUsersShouldWorkWithoutOptionalFilters() throws Exception {
+        when(userService.listUsers(any())).thenReturn(new PageResultVO<>(0L, 1L, 10L, List.of()));
+
+        mockMvc.perform(get("/api/v1/user/list")
+                        .param("pageNum", "1")
+                        .param("pageSize", "10")
+                        .param("realName", "大张伟"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(userService).listUsers(any());
+    }
+
+    @Test
+    void listUsersShouldTreatEmptyDeptIdAsNotFiltered() throws Exception {
+        when(userService.listUsers(any())).thenReturn(new PageResultVO<>(0L, 1L, 10L, List.of()));
+
+        mockMvc.perform(get("/api/v1/user/list")
+                        .param("pageNum", "1")
+                        .param("pageSize", "10")
+                        .param("deptId", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+    }
 
     @Test
     void addUserShouldReturnUserId() throws Exception {
@@ -56,6 +89,27 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("新增成功"))
                 .andExpect(jsonPath("$.data.userId").value(101));
+    }
+
+    @Test
+    void addUserShouldAllowPurchaserWithoutDeptId() throws Exception {
+        when(userService.addUser(any())).thenReturn(new AddUserVO(102L));
+
+        mockMvc.perform(post("/api/v1/user/add")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "wang_procure",
+                                  "password": "123456",
+                                  "realName": "王采购",
+                                  "role": "purchaser",
+                                  "phone": "13812345679"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("新增成功"))
+                .andExpect(jsonPath("$.data.userId").value(102));
     }
 
     @Test
