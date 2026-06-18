@@ -1,5 +1,6 @@
 package com.fengrui.frmanage;
 
+import com.fengrui.frmanage.config.CorsConfig;
 import com.fengrui.frmanage.config.SecurityConfig;
 import com.fengrui.frmanage.controller.SupplierController;
 import com.fengrui.frmanage.dto.supplier.SupplierQueryDTO;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 供应商接口控制器测试。
  */
 @WebMvcTest(SupplierController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, CorsConfig.class})
 class SupplierControllerTest {
 
     @Autowired

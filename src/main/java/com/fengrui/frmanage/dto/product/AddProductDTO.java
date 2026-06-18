@@ -22,30 +22,30 @@ public class AddProductDTO {
 
     @NotBlank(message = "商品名称不能为空")
     @Size(max = 200, message = "商品名称长度不能超过200个字符")
-    @Schema(description = "商品名称", example = "瓶装洗发水", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【商品名称】必填", example = "瓶装洗发水", requiredMode = Schema.RequiredMode.REQUIRED)
     private String productName;
 
     @NotBlank(message = "商品分类不能为空")
     @Size(max = 50, message = "商品分类长度不能超过50个字符")
-    @Schema(description = "商品分类", example = "客房用品", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【商品分类】必填，先调 GET /api/v1/dict/categories 获取下拉选项", example = "客房用品", requiredMode = Schema.RequiredMode.REQUIRED)
     private String category;
 
     @Size(max = 200, message = "规格型号长度不能超过200个字符")
-    @Schema(description = "规格型号", example = "300ml/瓶")
+    @Schema(description = "【规格型号】可选", example = "300ml/瓶")
     private String spec;
 
     @Size(max = 20, message = "单位长度不能超过20个字符")
-    @Schema(description = "单位", example = "瓶")
+    @Schema(description = "【单位】可选，如套/瓶/个", example = "瓶")
     private String unit;
 
     @NotNull(message = "成本单价不能为空")
     @DecimalMin(value = "0.00", message = "成本单价不能小于0")
     @Digits(integer = 14, fraction = 2, message = "成本单价最多14位整数和2位小数")
-    @Schema(description = "成本单价", example = "4.10", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【成本单价】必填，单位元，保留2位小数", example = "4.10", requiredMode = Schema.RequiredMode.REQUIRED)
     private BigDecimal costPrice;
 
     @NotNull(message = "预警阈值不能为空")
     @Min(value = 0, message = "预警阈值不能小于0")
-    @Schema(description = "预警阈值", example = "30", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【预警阈值】必填，库存低于此值触发预警", example = "30", requiredMode = Schema.RequiredMode.REQUIRED)
     private Integer warningThreshold;
 }

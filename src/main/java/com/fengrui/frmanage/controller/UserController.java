@@ -41,7 +41,7 @@ public class UserController {
      * @return 新增用户ID
      */
     @PostMapping("/add")
-    @Operation(summary = "新增用户", description = "创建系统用户，分配角色和所属部门")
+    @Operation(summary = "新增用户", description = "创建系统用户。请求体使用 account 作为登录名（入库 username 列）；phone 由后端自动填入 186XXXX9999，无需前端传参")
     public Result<AddUserVO> addUser(@Valid @RequestBody AddUserDTO addUserDTO) {
         return Result.success("新增成功", userService.addUser(addUserDTO));
     }

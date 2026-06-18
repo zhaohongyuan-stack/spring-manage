@@ -1,5 +1,6 @@
 package com.fengrui.frmanage;
 
+import com.fengrui.frmanage.config.CorsConfig;
 import com.fengrui.frmanage.config.SecurityConfig;
 import com.fengrui.frmanage.controller.ReceiveController;
 import com.fengrui.frmanage.dto.receive.ReceiveListQueryDTO;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 领用出库接口控制器测试。
  */
 @WebMvcTest(ReceiveController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, CorsConfig.class})
 class ReceiveControllerTest {
 
     @Autowired

@@ -29,6 +29,9 @@ public class UserServiceImpl implements UserService {
 
     private static final short DISABLED_STATUS = 0;
 
+    /** 新增用户未传 phone 时的默认占位手机号，避免前端冗余字段。 */
+    private static final String DEFAULT_PHONE = "186XXXX9999";
+
     private final UserMapper userMapper;
 
     private final DepartmentMapper departmentMapper;
@@ -55,12 +58,12 @@ public class UserServiceImpl implements UserService {
         validateAddUser(addUserDTO);
 
         User user = new User();
-        user.setUsername(addUserDTO.getUsername());
+        user.setUsername(addUserDTO.getAccount());
         user.setPassword(passwordEncoder.encode(addUserDTO.getPassword()));
         user.setRealName(addUserDTO.getRealName());
         user.setRole(addUserDTO.getRole());
         user.setDeptId(resolveDeptId(addUserDTO));
-        user.setPhone(addUserDTO.getPhone());
+        user.setPhone(DEFAULT_PHONE);
         user.setStatus(ENABLED_STATUS);
         userMapper.insert(user);
         return new AddUserVO(user.getId());
@@ -123,10 +126,10 @@ public class UserServiceImpl implements UserService {
         }
 
         Long sameUsernameCount = userMapper.selectCount(
-                new LambdaQueryWrapper<User>().eq(User::getUsername, addUserDTO.getUsername())
+                new LambdaQueryWrapper<User>().eq(User::getUsername, addUserDTO.getAccount())
         );
         if (sameUsernameCount > 0) {
-            throw new BusinessException("登录账号已存在");
+            throw new BusinessException("登录名已存在");
         }
 
         if (requiresDepartment(roleEnum)) {

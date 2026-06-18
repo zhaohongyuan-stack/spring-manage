@@ -1,5 +1,6 @@
 package com.fengrui.frmanage;
 
+import com.fengrui.frmanage.config.CorsConfig;
 import com.fengrui.frmanage.config.SecurityConfig;
 import com.fengrui.frmanage.controller.DepartmentController;
 import com.fengrui.frmanage.exception.GlobalExceptionHandler;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 部门接口控制器测试。
  */
 @WebMvcTest(DepartmentController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, CorsConfig.class})
 class DepartmentControllerTest {
 
     @Autowired

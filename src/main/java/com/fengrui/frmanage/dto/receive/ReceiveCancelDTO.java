@@ -14,10 +14,10 @@ import lombok.Setter;
 public class ReceiveCancelDTO {
 
     @NotNull(message = "领用单ID不能为空")
-    @Schema(description = "领用单ID", example = "201", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【领用单ID】必填，状态1/2时可取消", example = "201", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long receiveId;
 
     @NotNull(message = "操作人用户ID不能为空")
-    @Schema(description = "操作人用户ID", example = "1001", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【操作人】必填，申请人用户ID", example = "1001", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long operatorUserId;
 }

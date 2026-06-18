@@ -12,6 +12,6 @@ import lombok.Getter;
 @Schema(description = "新增用户响应数据")
 public class AddUserVO {
 
-    @Schema(description = "新增用户ID", example = "101")
+    @Schema(description = "【用户ID】新增成功返回的主键", example = "101")
     private Long userId;
 }

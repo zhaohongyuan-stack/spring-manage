@@ -26,7 +26,7 @@ public interface UserMapper extends BaseMapper<User> {
             <script>
             SELECT
                 u.id AS user_id,
-                u.username,
+                u.username AS account,
                 u.real_name,
                 u.role,
                 u.dept_id,

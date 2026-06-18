@@ -14,6 +14,6 @@ import lombok.Setter;
 public class DeleteUserDTO {
 
     @NotNull(message = "用户ID不能为空")
-    @Schema(description = "用户主键ID", example = "101", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【用户ID】必填，逻辑禁用目标用户", example = "101", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long userId;
 }

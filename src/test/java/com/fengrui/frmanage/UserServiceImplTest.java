@@ -99,9 +99,23 @@ class UserServiceImplTest {
         assertEquals(1L, userCaptor.getValue().getDeptId());
     }
 
+    @Test
+    void addUserShouldSetDefaultPhone() {
+        when(passwordEncoder.encode(any())).thenReturn("encoded-password");
+        when(userMapper.insert(any(User.class))).thenReturn(1);
+        when(departmentMapper.selectById(1L)).thenReturn(new Department());
+        AddUserDTO addUserDTO = buildAddUserDTO("dept_head", 1L);
+
+        userService.addUser(addUserDTO);
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userMapper).insert(userCaptor.capture());
+        assertEquals("186XXXX9999", userCaptor.getValue().getPhone());
+    }
+
     private AddUserDTO buildAddUserDTO(String role, Long deptId) {
         AddUserDTO addUserDTO = new AddUserDTO();
-        addUserDTO.setUsername("test_user");
+        addUserDTO.setAccount("test_user");
         addUserDTO.setPassword("123456");
         addUserDTO.setRealName("测试用户");
         addUserDTO.setRole(role);

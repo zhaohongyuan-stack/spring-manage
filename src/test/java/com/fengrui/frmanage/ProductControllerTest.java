@@ -1,5 +1,6 @@
 package com.fengrui.frmanage;
 
+import com.fengrui.frmanage.config.CorsConfig;
 import com.fengrui.frmanage.config.SecurityConfig;
 import com.fengrui.frmanage.controller.ProductController;
 import com.fengrui.frmanage.dto.product.ProductQueryDTO;
@@ -36,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 商品接口控制器测试。
  */
 @WebMvcTest(ProductController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, CorsConfig.class})
 class ProductControllerTest {
 
     @Autowired

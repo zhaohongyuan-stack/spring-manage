@@ -21,28 +21,28 @@ import java.util.List;
 public class AddPurchaseDTO {
 
     @NotNull(message = "申请部门ID不能为空")
-    @Schema(description = "申请部门ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【申请部门】必填，传数字ID（前端下拉选部门名称）", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long deptId;
 
     @NotNull(message = "申请人ID不能为空")
-    @Schema(description = "申请人用户ID", example = "1001", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【申请人】必填，当前登录用户ID", example = "1001", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long applyUserId;
 
     @NotNull(message = "需求日期不能为空")
     @FutureOrPresent(message = "需求日期不能早于当前日期")
-    @Schema(description = "需求日期", example = "2026-06-20", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【需求日期】必填，期望到货日期，格式 yyyy-MM-dd", example = "2026-06-20", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDate requireDate;
 
     @NotNull(message = "供应商ID不能为空")
-    @Schema(description = "供应商ID", example = "3", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【供应商】必填，传数字ID（前端下拉选供应商名称）", example = "3", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long supplierId;
 
     @Size(max = 500, message = "备注长度不能超过500个字符")
-    @Schema(description = "备注", example = "6月下旬客房用品补充")
+    @Schema(description = "【备注】可选", example = "6月下旬客房用品补充")
     private String remark;
 
     @Valid
     @NotEmpty(message = "采购明细不能为空")
-    @Schema(description = "采购明细列表", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【采购明细】必填，至少一条", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<AddPurchaseItemDTO> items;
 }

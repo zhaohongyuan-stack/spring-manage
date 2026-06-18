@@ -77,12 +77,11 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "zhangwei",
+                                  "account": "zhangwei336",
                                   "password": "123456",
                                   "realName": "张伟",
                                   "role": "dept_head",
-                                  "deptId": 1,
-                                  "phone": "13812345678"
+                                  "deptId": 1
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -99,11 +98,10 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "wang_procure",
+                                  "account": "wang_procure",
                                   "password": "123456",
                                   "realName": "王采购",
-                                  "role": "purchaser",
-                                  "phone": "13812345679"
+                                  "role": "purchaser"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -118,7 +116,7 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "",
+                                  "account": "",
                                   "password": "123456",
                                   "realName": "张伟",
                                   "role": "dept_head"
@@ -126,7 +124,7 @@ class UserControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("登录账号不能为空"));
+                .andExpect(jsonPath("$.message").value("登录名不能为空"));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.fengrui.frmanage;
 
+import com.fengrui.frmanage.config.CorsConfig;
 import com.fengrui.frmanage.config.SecurityConfig;
 import com.fengrui.frmanage.controller.PurchaseController;
 import com.fengrui.frmanage.dto.purchase.PurchaseListQueryDTO;
@@ -36,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 采购接口控制器测试。
  */
 @WebMvcTest(PurchaseController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class})
+@Import({GlobalExceptionHandler.class, SecurityConfig.class, CorsConfig.class})
 class PurchaseControllerTest {
 
     @Autowired

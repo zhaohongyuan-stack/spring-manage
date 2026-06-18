@@ -19,23 +19,23 @@ import java.util.List;
 public class AddInboundDTO {
 
     @NotNull(message = "采购单ID不能为空")
-    @Schema(description = "采购单ID", example = "101", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【采购单ID】必填，关联已确认采购单", example = "101", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long purchaseId;
 
     @NotNull(message = "仓库管理员用户ID不能为空")
-    @Schema(description = "仓库管理员用户ID", example = "2001", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【收货人】必填，当前登录仓管用户ID", example = "2001", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long receiverUserId;
 
     @NotNull(message = "入库类型不能为空")
-    @Schema(description = "入库类型：1常规入库，2食材直拨", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【入库类型】必填，1常规入库/2食材直拨", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
     private Integer inboundType;
 
     @Size(max = 500, message = "备注长度不能超过500个字符")
-    @Schema(description = "备注", example = "外包装损坏2套，已退回")
+    @Schema(description = "【备注】可选", example = "外包装损坏2套，已退回")
     private String remark;
 
     @Valid
     @NotEmpty(message = "入库明细不能为空")
-    @Schema(description = "入库明细列表", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【入库明细】必填，至少一条", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<AddInboundItemDTO> items;
 }

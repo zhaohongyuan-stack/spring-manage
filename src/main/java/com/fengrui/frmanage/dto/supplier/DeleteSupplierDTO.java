@@ -14,6 +14,6 @@ import lombok.Setter;
 public class DeleteSupplierDTO {
 
     @NotNull(message = "供应商ID不能为空")
-    @Schema(description = "供应商主键ID", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【供应商ID】必填，已被采购单引用时不可删", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long id;
 }

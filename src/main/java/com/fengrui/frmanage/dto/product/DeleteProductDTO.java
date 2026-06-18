@@ -14,6 +14,6 @@ import lombok.Setter;
 public class DeleteProductDTO {
 
     @NotNull(message = "商品ID不能为空")
-    @Schema(description = "商品ID", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "【商品ID】必填，逻辑删除", example = "2", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long productId;
 }
